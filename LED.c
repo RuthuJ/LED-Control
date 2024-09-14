@@ -1,86 +1,91 @@
-#include <stdio.h>
-#include <stdint.h>
+#include <lpc21xx.h>  // LPC2129 specific hardware definitions
 
-// Structure to represent individual LED settings
+// Define LED settings structure
 typedef struct {
-    uint8_t state;       // LED ON or OFF state (1 = ON, 0 = OFF)
-    uint8_t brightness;  // LED brightness level (0 - 255)
-    uint32_t color;      // LED color in RGB format
+    uint8_t state;      // LED ON or OFF state (1 for ON, 0 for OFF)
+    uint8_t brightness; // Brightness level (0 to 255)
+    uint32_t color;     // Color in RGB format  
 } LED_settings;
 
-// Structure to represent a group of LEDs
+// Define LED group structure
 typedef struct {
-    LED_settings single_LED;   // Individual LED settings
-    uint8_t group_state;      // Group ON or OFF state (1 = all ON, 0 = all OFF)
-    uint8_t group_brightness; // Group brightness adjustment (0 - 255)
+    LED_settings single_LED;    // Individual LED settings
+    uint8_t group_state;       // Collective state of the group (1 for all ON, 0 for all OFF)
+    uint8_t group_brightness;  // Collective brightness adjustment for the group
 } LED_group;
 
-// Function to initialize an LED group with default values
-void initLED_group(LED_group *group) {
-    group->single_LED.state = 0;               // Set individual LED to OFF
-    group->single_LED.brightness = 0;          // Set brightness to minimum
-    group->single_LED.color = 0x000000;        // Set color default
-    group->group_state = 0;                    // Set group to OFF
-    group->group_brightness = 0;               // Set group brightness to minimum
+// Function prototypes
+void init_LED_group(LED_group *group);
+void update_LED_group_settings(LED_group *group, uint8_t group_state, uint8_t group_brightness, uint8_t state, uint8_t brightness, uint32_t color);
+void delay(unsigned int ms);
+
+// Initialize LED Group with default values
+void init_LED_group(LED_group *group) {
+    if (group != NULL) {
+        group->single_LED.state = 0;        // LEDs OFF
+        group->single_LED.brightness = 0;   // Minimum brightness
+        group->single_LED.color = 0x000000; // No color (0xRRGGBB)
+        group->group_state = 0;             // All LEDs OFF in the group
+        group->group_brightness = 0;        // Minimum brightness for the group
+
+        // Set up GPIO pins for LEDs (assuming Port 1 Pins 17,18,19)
+        IODIR1 |= (1 << 17) | (1 << 18) | (1 << 19);  // Set P1.17, P1.18, P1.19 as output (for 3 LEDs)
+    }
 }
 
-// Function to update individual and group LED settings
-void updateLED_groupSettings(LED_group *group, uint8_t group_state, uint8_t group_brightness, 
-                            uint8_t state, uint8_t brightness, uint32_t color) {
-    // Update individual LED settings
-    group->single_LED.state = state;
-    group->single_LED.brightness = brightness;
-    group->single_LED.color = color;
+// Function to update LED Group Settings and control the hardware
+void update_LED_group_settings(LED_group *group, uint8_t group_state, uint8_t group_brightness, uint8_t state, uint8_t brightness, uint32_t color) {
+    if (group != NULL) {
+        // Update individual LED settings
+        group->single_LED.state = state;
+        group->single_LED.brightness = brightness;
+        group->single_LED.color = color;
 
-    // Update group settings
-    group->group_state = group_state;
-    group->group_brightness = group_brightness;
+        // Update group settings
+        group->group_state = group_state;
+        group->group_brightness = group_brightness;
+
+        // Control hardware
+        if (group->single_LED.state) {
+            IOSET1 = (1 << 17);   // Turn ON LED at P1.17
+        } else {
+            IOCLR1 = (1 << 17);   // Turn OFF LED at P1.17
+        }
+
+        // If group state is ON, turn on additional LEDs (e.g., P1.18, P1.19)
+        if (group->group_state) {
+            IOSET1 = (1 << 18) | (1 << 19);   // Turn ON LEDs at P1.18 and P1.19
+        } 
+        else {
+            IOCLR1 = (1 << 18) | (1 << 19);   // Turn OFF LEDs at P1.18 and P1.19
+        }
+    }
 }
 
-// Function to display the current status of the LED group
-void displayLEDGroupStatus(const LED_group *group) {
-    printf("Individual LED State: %s\n", group->single_LED.state ? "ON" : "OFF");
-    printf("Individual LED Brightness: %u\n", group->single_LED.brightness);
-    printf("Individual LED Color (RGB): 0x%06X\n", group->single_LED.color);
-    printf("Group State: %s\n", group->group_state ? "ALL ON" : "ALL OFF");
-    printf("Group Brightness: %u\n", group->group_brightness);
+// Simple delay function
+void delay(unsigned int ms) {
+    unsigned int i, j;
+    for (i = 0; i < ms; i++) {
+        for (j = 0; j < 6000; j++);  // Approximate delay for 1 ms
+    }
 }
 
-// Main function for testing the LED control system
-int main() {
+// Main function for LED control
+int main(void) {
     LED_group led_group;
-    uint8_t group_state, state, group_brightness, brightness;
-    uint32_t color;
 
-    // Initialize the LED group with default values
-    initLED_group(&led_group);
-    
-    // Display initial status
-    printf("Initial LED Group Status:\n");
-    displayLED_groupStatus(&led_group);
-    
-    // Get user input
-    printf("\nEnter group state (1 for ALL ON, 0 for ALL OFF): ");
-    scanf("%hhu", &group_state);
+    // Initialize the LED group
+    init_LED_group(&led_group);
 
-    printf("Enter group brightness (0 - 255): ");
-    scanf("%hhu", &group_brightness);
+    while (1) {
+        // Turn ON individual LED, group ON, brightness 255
+        update_LED_groups_settings(&led_group, 1, 255, 1, 255, 0x1257FF);  // Example update
+        delay(1000);  // Delay for 1 second
 
-    printf("Enter individual LED state (1 for ON, 0 for OFF): ");
-    scanf("%hhu", &state);
-
-    printf("Enter individual LED brightness (0 - 255): ");
-    scanf("%hhu", &brightness);
-
-    printf("Enter individual LED color in RGB format (hexadecimal, e.g., 0x1200FF): ");
-    scanf("%x", &color);
-
-    // Update the LED group settings with user input
-    updateLED_groupSettings(&led_group, group_state, group_brightness, state, brightness, color);
-    
-    // Display updated status
-    printf("\nUpdated LED Group Status:\n");
-    displayLED_groupStatus(&led_group);
+        // Turn OFF all LEDs
+        update_LED_group_settings(&led_group, 0, 0, 0, 0, 0x000000);  // Turn off LEDs
+        delay(1000);  // Delay for 1 second
+    }
 
     return 0;
 }
