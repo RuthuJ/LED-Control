@@ -89,3 +89,4 @@ int main(void) {
 
     return 0;
 }
+// In order to execute or run the code in Keil built the code choose appropriate Flash magi use HEX file, set the baud rate JTAG it to the hardware and verify.
